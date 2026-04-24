@@ -115,6 +115,10 @@ const buildSignedNdaAssetPathFromUrl = (urlValue) => {
       url.pathname.slice(markerIndex + SIGNED_NDA_MARKER.length)
     );
 
+    if (assetPath.includes('..')) {
+      return null;
+    }
+
     return assetPath.startsWith("signed-ndas/") ? assetPath : null;
   } catch {
     return null;
