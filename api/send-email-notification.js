@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   validateRequestOrigin,
   checkRequestRateLimit,
+  sanitizeErrorMsg,
 } from './shared/originGuard.js';
 
 function createSupabaseAdminClient() {
@@ -191,7 +192,7 @@ export default async function handler(req, res) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({
       error: 'Email notification failed',
-      detail: message,
+      detail: sanitizeErrorMsg(message),
     });
   }
 }

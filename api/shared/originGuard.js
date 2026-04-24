@@ -86,12 +86,34 @@ function pruneStaleEntries(windowMs) {
 }
 
 function getClientIp(req) {
-  // Vercel and Cloud Run set x-forwarded-for; fall back to socket address
+  // Vercel and Cloud Run append the true client IP to the rightmost end of x-forwarded-for.
+  // Using the leftmost IP is insecure as it is caller-controlled.
   const forwarded = req.headers?.["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0].trim();
+  if (typeof forwarded === "string" && forwarded.trim().length > 0) {
+    const ips = forwarded.split(",");
+    const ip = ips[ips.length - 1].trim();
+    if (ip) return ip;
   }
+  
+  const realIp = req.headers?.["x-real-ip"];
+  if (typeof realIp === "string" && realIp.trim()) {
+    return realIp.trim();
+  }
+  
   return req.socket?.remoteAddress || "unknown";
+}
+
+/**
+ * Redacts common secrets (OpenAI keys, Google API keys, Bearer tokens, and query params)
+ * from error strings to prevent leaking sensitive material to the client.
+ */
+export function sanitizeErrorMsg(message) {
+  if (typeof message !== "string") return "Unknown error";
+  return message
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, "Bearer [REDACTED]")
+    .replace(/sk-[A-Za-z0-9_\-]{20,}/g, "sk-[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "AIza-[REDACTED]")
+    .replace(/(\?|&)(api_key|token|access_token|secret)=[^&]+/gi, "$1$2=[REDACTED]");
 }
 
 /**

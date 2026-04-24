@@ -6,6 +6,7 @@
 import {
   validateRequestOrigin,
   checkRequestRateLimit,
+  sanitizeErrorMsg,
 } from './shared/originGuard.js';
 
 const SYSTEM_PROMPT = `You are an assistant that PRE-FILLS an INVESTOR PROFILE from minimal information.
@@ -217,7 +218,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error generating investor profile:', error);
     return res.status(500).json({ 
-      error: error.message || 'Failed to generate investor profile' 
+      error: sanitizeErrorMsg(error.message || 'Failed to generate investor profile') 
     });
   }
 }

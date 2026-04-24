@@ -2,6 +2,7 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import {
   validateRequestOrigin,
   checkRequestRateLimit,
+  sanitizeErrorMsg,
 } from "./shared/originGuard.js";
 
 const REQUIRED_FIELDS = [
@@ -259,6 +260,6 @@ Rules:
   } catch (error) {
     console.error("Enrichment handler failed:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    return response.status(500).json({ error: message });
+    return response.status(500).json({ error: sanitizeErrorMsg(message) });
   }
 }

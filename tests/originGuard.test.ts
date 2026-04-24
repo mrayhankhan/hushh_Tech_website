@@ -36,6 +36,7 @@ describe('originGuard', () => {
   let validateRequestOrigin;
   let checkRequestRateLimit;
   let __resetRateLimitState;
+  let sanitizeErrorMsg;
 
   beforeEach(async () => {
     // Reset rate limit state between tests
@@ -43,6 +44,7 @@ describe('originGuard', () => {
     validateRequestOrigin = mod.validateRequestOrigin;
     checkRequestRateLimit = mod.checkRequestRateLimit;
     __resetRateLimitState = mod.__resetRateLimitState;
+    sanitizeErrorMsg = mod.sanitizeErrorMsg;
     __resetRateLimitState();
   });
 
@@ -225,6 +227,37 @@ describe('originGuard', () => {
         maxRequests: 5,
       });
       expect(blocked).toBe(false);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Secret Redaction
+  // -----------------------------------------------------------------------
+
+  describe('sanitizeErrorMsg', () => {
+    it('redacts OpenAI secret keys', () => {
+      const msg = 'Failed because sk-aBcDeFg1234567890HijklmnoPqrstuvwxyz was invalid';
+      expect(sanitizeErrorMsg(msg)).toBe('Failed because sk-[REDACTED] was invalid');
+    });
+
+    it('redacts Bearer tokens', () => {
+      const msg = 'Auth failed: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xyz';
+      expect(sanitizeErrorMsg(msg)).toBe('Auth failed: Bearer [REDACTED]');
+    });
+
+    it('redacts Google API keys', () => {
+      const msg = 'Error AIzaSyD_abc123DEF456_ghi789jkl-mnopqr';
+      expect(sanitizeErrorMsg(msg)).toBe('Error AIza-[REDACTED]');
+    });
+
+    it('redacts query parameter secrets', () => {
+      const msg = 'Fetching https://api.example.com/data?token=supersecret123&other=val';
+      expect(sanitizeErrorMsg(msg)).toBe('Fetching https://api.example.com/data?token=[REDACTED]&other=val');
+    });
+
+    it('passes through safe strings', () => {
+      const msg = 'Connection timeout reached after 5000ms';
+      expect(sanitizeErrorMsg(msg)).toBe(msg);
     });
   });
 });
