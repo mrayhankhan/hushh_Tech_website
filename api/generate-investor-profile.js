@@ -3,6 +3,11 @@
  * This runs server-side to avoid CORS issues and keep API keys secure
  */
 
+import {
+  validateRequestOrigin,
+  checkRequestRateLimit,
+} from './shared/originGuard.js';
+
 const SYSTEM_PROMPT = `You are an assistant that PRE-FILLS an INVESTOR PROFILE from minimal information.
 
 You are given:
@@ -100,15 +105,6 @@ const PROFILE_SCHEMA = {
 };
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
-
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -119,6 +115,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
+
+  // Gate access: each request costs OpenAI GPT-4o credits
+  if (validateRequestOrigin(req, res)) return;
+  if (checkRequestRateLimit(req, res, { windowMs: 60_000, maxRequests: 20 })) return;
 
   try {
     const { input, context } = req.body;

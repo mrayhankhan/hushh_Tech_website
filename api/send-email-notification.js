@@ -3,13 +3,10 @@
 
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import {
+  validateRequestOrigin,
+  checkRequestRateLimit,
+} from './shared/originGuard.js';
 
 function createSupabaseAdminClient() {
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
@@ -60,6 +57,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Gate access: email sends consume Gmail quota and risk sender-reputation damage
+  if (validateRequestOrigin(req, res)) return;
+  if (checkRequestRateLimit(req, res, { windowMs: 60_000, maxRequests: 10 })) return;
 
   try {
     const { type, slug, profileOwnerEmail, profileName, testEmail } = req.body;
@@ -186,10 +187,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true, emailSent: true });
   } catch (error) {
-    console.error('Email error:', error);
-    return res.status(500).json({ 
-      error: error.message || 'Failed to send email',
-      details: error.toString()
+    console.error('[api/send-email-notification] handler failed:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Email notification failed',
+      detail: message,
     });
   }
 }

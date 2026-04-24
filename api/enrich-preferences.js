@@ -1,4 +1,8 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import {
+  validateRequestOrigin,
+  checkRequestRateLimit,
+} from "./shared/originGuard.js";
 
 const REQUIRED_FIELDS = [
   "name",
@@ -159,6 +163,10 @@ export default async function handler(request, response) {
   if (request.method !== "POST") {
     return response.status(405).json({ error: "Method not allowed" });
   }
+
+  // Gate access: each request costs OpenAI chat-completion credits
+  if (validateRequestOrigin(request, response)) return;
+  if (checkRequestRateLimit(request, response, { windowMs: 60_000, maxRequests: 20 })) return;
 
   try {
     const body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : request.body || {};
